@@ -932,6 +932,54 @@ a:hover {
 }
 
 /* =====================================================
+   STATE COMPONENTS (Loading, Error, Empty)
+   ===================================================== */
+.state-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-2xl);
+  text-align: center;
+  gap: var(--space-md);
+}
+
+.state-container svg {
+  opacity: 0.7;
+}
+
+.state-text {
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+}
+
+.state-text-error {
+  color: var(--color-danger);
+}
+
+.state-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.state-description {
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  max-width: 360px;
+}
+
+.spin {
+  color: var(--color-primary);
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* =====================================================
    ANIMATIONS
    ===================================================== */
 @keyframes fadeIn {

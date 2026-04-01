@@ -25,7 +25,6 @@ services:
             AUTH_GRAVATAR_ENABLED: "true"
             AUTH_GRAVATAR_RATING: g
             AUTH_HOST: 0.0.0.0
-            AUTH_JWT_CUSTOM_CLAIMS: '{}'
             AUTH_LOCALE_ALLOWED_LOCALES: en,fr
             AUTH_LOCALE_DEFAULT: fr
             AUTH_MFA_ENABLED: "false"
