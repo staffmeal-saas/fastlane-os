@@ -1,44 +1,108 @@
-import { useAuth } from '../../contexts/AuthContext'
-import { LogOut, Bell, Menu } from 'lucide-react'
+import { useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "../../contexts/AuthContext";
+import { useGraphQL } from "../../hooks/useGraphQL";
+import { LogOut, Bell, Menu } from "lucide-react";
 
 interface HeaderProps {
-  title: string
-  onMenuClick?: () => void
+  title: string;
+  onMenuClick?: () => void;
+}
+
+const UNREAD_COUNT_QUERY = `query {
+  notifications_aggregate(where: { is_read: { _eq: false } }) {
+    aggregate { count }
+  }
+}`;
+
+interface UnreadData {
+  notifications_aggregate: { aggregate: { count: number } };
 }
 
 export default function Header({ title, onMenuClick }: HeaderProps) {
-  const { user, profile, signOut } = useAuth()
+  const { user, profile, signOut } = useAuth();
+  const navigate = useNavigate();
 
-  const displayName = profile?.display_name || user?.email?.split('@')[0] || 'Utilisateur'
-  const initials = displayName.slice(0, 2).toUpperCase()
+  const { data, refetch } = useGraphQL<UnreadData>({
+    query: UNREAD_COUNT_QUERY,
+    skip: !user,
+  });
+
+  const unreadCount = data?.notifications_aggregate?.aggregate?.count ?? 0;
+
+  useEffect(() => {
+    if (!user) return;
+    const interval = setInterval(() => {
+      refetch();
+    }, 30_000);
+    return () => clearInterval(interval);
+  }, [user, refetch]);
+
+  const displayName =
+    profile?.display_name || user?.email?.split("@")[0] || "Utilisateur";
+  const initials = displayName.slice(0, 2).toUpperCase();
 
   return (
     <header className="header">
-      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-md)' }}>
-        <button className="btn btn-ghost" onClick={onMenuClick} style={{ display: 'none' }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "var(--space-md)",
+        }}
+      >
+        <button className="btn btn-ghost mobile-menu-btn" onClick={onMenuClick}>
           <Menu size={20} />
         </button>
         <h2 className="header-title">{title}</h2>
       </div>
 
       <div className="header-actions">
-        <button className="btn btn-ghost" style={{ position: 'relative' }}>
+        <button
+          className="btn btn-ghost"
+          style={{ position: "relative" }}
+          onClick={() => navigate("/notifications")}
+          title="Notifications"
+        >
           <Bell size={18} />
-          <span style={{
-            position: 'absolute', top: -2, right: -2,
-            width: 8, height: 8, borderRadius: '50%',
-            background: 'var(--color-danger)'
-          }} />
+          {unreadCount > 0 && (
+            <span
+              style={{
+                position: "absolute",
+                top: -4,
+                right: -4,
+                minWidth: 18,
+                height: 18,
+                borderRadius: "var(--radius-full)",
+                background: "var(--color-danger)",
+                color: "white",
+                fontSize: "0.65rem",
+                fontWeight: 700,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: "0 4px",
+              }}
+            >
+              {unreadCount > 99 ? "99+" : unreadCount}
+            </span>
+          )}
         </button>
 
         <div className="header-user" onClick={signOut} title="Se déconnecter">
           <div className="user-avatar">{initials}</div>
-          <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--color-text)' }}>
+          <span
+            style={{
+              fontSize: "0.85rem",
+              fontWeight: 600,
+              color: "var(--color-text)",
+            }}
+          >
             {displayName}
           </span>
-          <LogOut size={14} style={{ color: 'var(--color-text-muted)' }} />
+          <LogOut size={14} style={{ color: "var(--color-text-muted)" }} />
         </div>
       </div>
     </header>
-  )
+  );
 }

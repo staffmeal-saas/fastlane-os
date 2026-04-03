@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap");
 
 /* =====================================================
    FASTLANE OS — Design System
@@ -43,8 +43,16 @@
   /* Gradients */
   --gradient-primary: linear-gradient(135deg, #3b82f6, #8b5cf6);
   --gradient-success: linear-gradient(135deg, #10b981, #06b6d4);
-  --gradient-card: linear-gradient(135deg, rgba(15, 23, 42, 0.8), rgba(30, 41, 59, 0.4));
-  --gradient-sidebar: linear-gradient(180deg, rgba(8, 12, 24, 0.98), rgba(15, 23, 42, 0.95));
+  --gradient-card: linear-gradient(
+    135deg,
+    rgba(15, 23, 42, 0.8),
+    rgba(30, 41, 59, 0.4)
+  );
+  --gradient-sidebar: linear-gradient(
+    180deg,
+    rgba(8, 12, 24, 0.98),
+    rgba(15, 23, 42, 0.95)
+  );
 
   /* Shadows */
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
@@ -78,13 +86,16 @@
   --transition-slow: 400ms ease;
 
   /* Font */
-  --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-family:
+    "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
 /* =====================================================
    RESET & BASE
    ===================================================== */
-*, *::before, *::after {
+*,
+*::before,
+*::after {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
@@ -417,7 +428,7 @@ a:hover {
 }
 
 .stat-card::before {
-  content: '';
+  content: "";
   position: absolute;
   top: 0;
   left: 0;
@@ -566,12 +577,30 @@ a:hover {
   letter-spacing: 0.3px;
 }
 
-.badge-primary { background: var(--color-primary-soft); color: var(--color-primary); }
-.badge-success { background: var(--color-success-soft); color: var(--color-success); }
-.badge-warning { background: var(--color-warning-soft); color: var(--color-warning); }
-.badge-danger { background: var(--color-danger-soft); color: var(--color-danger); }
-.badge-info { background: var(--color-info-soft); color: var(--color-info); }
-.badge-purple { background: var(--color-purple-soft); color: var(--color-purple); }
+.badge-primary {
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+}
+.badge-success {
+  background: var(--color-success-soft);
+  color: var(--color-success);
+}
+.badge-warning {
+  background: var(--color-warning-soft);
+  color: var(--color-warning);
+}
+.badge-danger {
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
+}
+.badge-info {
+  background: var(--color-info-soft);
+  color: var(--color-info);
+}
+.badge-purple {
+  background: var(--color-purple-soft);
+  color: var(--color-purple);
+}
 
 /* =====================================================
    TABLES
@@ -624,7 +653,9 @@ a:hover {
   margin-bottom: var(--space-sm);
 }
 
-.form-input, .form-select, .form-textarea {
+.form-input,
+.form-select,
+.form-textarea {
   width: 100%;
   padding: var(--space-sm) var(--space-md);
   background: var(--color-bg-input);
@@ -637,7 +668,9 @@ a:hover {
   outline: none;
 }
 
-.form-input:focus, .form-select:focus, .form-textarea:focus {
+.form-input:focus,
+.form-select:focus,
+.form-textarea:focus {
   border-color: var(--color-border-focus);
   box-shadow: 0 0 0 3px var(--color-primary-soft);
 }
@@ -870,7 +903,7 @@ a:hover {
 }
 
 .timeline::before {
-  content: '';
+  content: "";
   position: absolute;
   left: 8px;
   top: 0;
@@ -886,7 +919,7 @@ a:hover {
 }
 
 .timeline-item::before {
-  content: '';
+  content: "";
   position: absolute;
   left: -19px;
   top: 6px;
@@ -975,26 +1008,46 @@ a:hover {
 }
 
 @keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* =====================================================
    ANIMATIONS
    ===================================================== */
 @keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 @keyframes slideUp {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @keyframes slideRight {
-  from { opacity: 0; transform: translateX(-20px); }
-  to { opacity: 1; transform: translateX(0); }
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 
 .animate-in {
@@ -1015,20 +1068,33 @@ a:hover {
 }
 
 .login-page::before {
-  content: '';
+  content: "";
   position: absolute;
   top: -50%;
   left: -50%;
   width: 200%;
   height: 200%;
-  background: radial-gradient(ellipse at 30% 50%, rgba(59, 130, 246, 0.08) 0%, transparent 50%),
-              radial-gradient(ellipse at 70% 50%, rgba(139, 92, 246, 0.06) 0%, transparent 50%);
+  background:
+    radial-gradient(
+      ellipse at 30% 50%,
+      rgba(59, 130, 246, 0.08) 0%,
+      transparent 50%
+    ),
+    radial-gradient(
+      ellipse at 70% 50%,
+      rgba(139, 92, 246, 0.06) 0%,
+      transparent 50%
+    );
   animation: rotate 30s linear infinite;
 }
 
 @keyframes rotate {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .login-card {
@@ -1074,6 +1140,64 @@ a:hover {
 }
 
 /* =====================================================
+   MOBILE MENU BUTTON (hidden on desktop)
+   ===================================================== */
+.mobile-menu-btn {
+  display: none;
+}
+
+/* =====================================================
+   SIDEBAR BACKDROP (mobile overlay)
+   ===================================================== */
+.sidebar-backdrop {
+  display: none;
+}
+
+/* =====================================================
+   SKELETON SHIMMER
+   ===================================================== */
+.skeleton-shimmer {
+  position: relative;
+  overflow: hidden;
+}
+
+.skeleton-shimmer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.04) 50%,
+    transparent 100%
+  );
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+
+/* =====================================================
+   TOAST ANIMATION
+   ===================================================== */
+@keyframes toastSlideIn {
+  from {
+    opacity: 0;
+    transform: translateX(40px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* =====================================================
    RESPONSIVE
    ===================================================== */
 @media (max-width: 768px) {
@@ -1081,14 +1205,36 @@ a:hover {
     --sidebar-width: 0px;
   }
 
+  .mobile-menu-btn {
+    display: inline-flex;
+  }
+
   .sidebar {
+    position: fixed;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 260px;
+    z-index: 1000;
     transform: translateX(-100%);
-    transition: transform var(--transition-base);
+    transition: transform 0.3s ease;
   }
 
   .sidebar.open {
     transform: translateX(0);
-    width: 260px;
+  }
+
+  .sidebar-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 999;
+    animation: fadeIn 0.2s ease;
+  }
+
+  .main-content {
+    margin-left: 0;
   }
 
   .header {
