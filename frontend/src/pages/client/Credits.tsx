@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Wallet,
   ArrowUpRight,
@@ -11,6 +11,8 @@ import {
 import { Link } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 import { useGraphQL } from "../../hooks/useGraphQL";
+import { usePagination } from "../../hooks/usePagination";
+import Pagination from "../../components/Pagination";
 import LoadingState from "../../components/UI/LoadingState";
 import ErrorState from "../../components/UI/ErrorState";
 import type { TransactionType } from "../../types";
@@ -45,6 +47,7 @@ interface TransactionsData {
     description?: string;
     created_at: string;
   }>;
+  wallet_transactions_aggregate: { aggregate: { count: number } };
   allocation_aggregate: { aggregate: { sum: { amount: number } | null } };
   recharge_aggregate: { aggregate: { sum: { amount: number } | null } };
   consumption_aggregate: { aggregate: { sum: { amount: number } | null } };
@@ -63,20 +66,28 @@ interface CreditBreakdownItem {
 export default function Credits() {
   const { currentWallet } = useAuth();
   const [filter, setFilter] = useState<TransactionFilter>("all");
+  const { currentPage, pageSize, offset, setPage, resetPage } = usePagination();
+
+  useEffect(() => { resetPage() }, [filter, resetPage]);
+
+  const where = filter === "all" ? {} : { type: { _eq: filter } };
 
   const { data, loading, error, refetch } = useGraphQL<TransactionsData>({
-    query: `query {
-      wallet_transactions(order_by: { created_at: desc }, limit: 50) {
+    query: `query($limit: Int!, $offset: Int!, $where: wallet_transactions_bool_exp) {
+      wallet_transactions(order_by: { created_at: desc }, limit: $limit, offset: $offset, where: $where) {
         id type amount balance_after description created_at
       }
+      wallet_transactions_aggregate(where: $where) { aggregate { count } }
       allocation_aggregate: wallet_transactions_aggregate(where: { type: { _eq: "allocation" } }) { aggregate { sum { amount } } }
       recharge_aggregate: wallet_transactions_aggregate(where: { type: { _eq: "recharge" } }) { aggregate { sum { amount } } }
       consumption_aggregate: wallet_transactions_aggregate(where: { type: { _eq: "consumption" } }) { aggregate { sum { amount } } }
       reservation_aggregate: wallet_transactions_aggregate(where: { type: { _eq: "reservation" } }) { aggregate { sum { amount } } }
     }`,
+    variables: { limit: pageSize, offset, where },
   });
 
   const transactions = data?.wallet_transactions || [];
+  const totalCount = data?.wallet_transactions_aggregate?.aggregate?.count || 0;
 
   const balance = currentWallet?.balance || 0;
   const reserved = currentWallet?.reserved || 0;
@@ -92,11 +103,6 @@ export default function Credits() {
   const totalReserved = Math.abs(
     data?.reservation_aggregate?.aggregate?.sum?.amount || 0,
   );
-
-  const filtered =
-    filter === "all"
-      ? transactions
-      : transactions.filter((t) => t.type === filter);
 
   if (loading) return <LoadingState />;
   if (error) return <ErrorState message={error} onRetry={refetch} />;
@@ -131,7 +137,6 @@ export default function Credits() {
         </Link>
       </div>
 
-      {/* 6 stat blocks per CDC 7.5 */}
       <div
         style={{
           display: "grid",
@@ -244,7 +249,6 @@ export default function Credits() {
         </div>
       </div>
 
-      {/* Credit Meter */}
       {balance > 0 && (
         <div className="card" style={{ marginBottom: "var(--space-xl)" }}>
           <div className="card-header">
@@ -290,7 +294,6 @@ export default function Credits() {
         </div>
       )}
 
-      {/* Transaction History */}
       <div className="card">
         <div className="card-header">
           <span className="card-title">Historique des mouvements</span>
@@ -325,7 +328,7 @@ export default function Credits() {
             </tr>
           </thead>
           <tbody>
-            {filtered.map((t) => (
+            {transactions.map((t) => (
               <tr key={t.id}>
                 <td style={{ whiteSpace: "nowrap" }}>
                   {new Date(t.created_at).toLocaleDateString("fr-FR", {
@@ -366,7 +369,7 @@ export default function Credits() {
                 </td>
               </tr>
             ))}
-            {filtered.length === 0 && (
+            {transactions.length === 0 && (
               <tr>
                 <td
                   colSpan={5}
@@ -382,6 +385,8 @@ export default function Credits() {
             )}
           </tbody>
         </table>
+
+        <Pagination currentPage={currentPage} totalCount={totalCount} pageSize={pageSize} onPageChange={setPage} />
       </div>
     </div>
   );

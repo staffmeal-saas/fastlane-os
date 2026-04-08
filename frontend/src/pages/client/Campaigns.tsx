@@ -1,7 +1,9 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { Search, Users, Calendar, Wallet, Zap } from 'lucide-react'
 import { useGraphQL } from '../../hooks/useGraphQL'
+import { usePagination } from '../../hooks/usePagination'
+import Pagination from '../../components/Pagination'
 import LoadingState from '../../components/UI/LoadingState'
 import ErrorState from '../../components/UI/ErrorState'
 import type { CampaignStatus } from '../../types'
@@ -15,6 +17,7 @@ interface CampaignsData {
     start_date?: string; end_date?: string; credits_budget: number; credits_consumed: number
     actions_aggregate?: { aggregate?: { count?: number } }
   }>
+  campaigns_aggregate: { aggregate: { count: number } }
 }
 
 type StatusFilter = 'all' | CampaignStatus
@@ -22,20 +25,25 @@ type StatusFilter = 'all' | CampaignStatus
 export default function Campaigns() {
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
+  const { currentPage, pageSize, offset, setPage, resetPage } = usePagination()
+
+  useEffect(() => { resetPage() }, [search, statusFilter, resetPage])
+
+  const where = buildWhere(search, statusFilter)
 
   const { data, loading, error, refetch } = useGraphQL<CampaignsData>({
-    query: `query {
-      campaigns(order_by: { created_at: desc }) {
+    query: `query($limit: Int!, $offset: Int!, $where: campaigns_bool_exp) {
+      campaigns(order_by: { created_at: desc }, limit: $limit, offset: $offset, where: $where) {
         id name description status start_date end_date credits_budget credits_consumed
         actions_aggregate { aggregate { count } }
       }
-    }`
+      campaigns_aggregate(where: $where) { aggregate { count } }
+    }`,
+    variables: { limit: pageSize, offset, where }
   })
 
   const campaigns = data?.campaigns || []
-  const filtered = campaigns
-    .filter(c => statusFilter === 'all' || c.status === statusFilter)
-    .filter(c => c.name.toLowerCase().includes(search.toLowerCase()))
+  const totalCount = data?.campaigns_aggregate?.aggregate?.count || 0
 
   if (loading) return <LoadingState />
   if (error) return <ErrorState message={error} onRetry={refetch} />
@@ -45,7 +53,7 @@ export default function Campaigns() {
       <div className="page-header">
         <div>
           <h1 className="page-title">Campagnes</h1>
-          <p className="page-subtitle">{campaigns.length} campagnes</p>
+          <p className="page-subtitle">{totalCount} campagnes</p>
         </div>
       </div>
 
@@ -64,7 +72,7 @@ export default function Campaigns() {
       </div>
 
       <div className="section-grid">
-        {filtered.map(c => (
+        {campaigns.map(c => (
           <Link to={`/campaigns/${c.id}`} key={c.id} className="card" style={{ textDecoration: 'none', color: 'inherit', cursor: 'pointer' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 'var(--space-md)' }}>
               <div>
@@ -91,8 +99,23 @@ export default function Campaigns() {
             )}
           </Link>
         ))}
-        {filtered.length === 0 && <div className="card" style={{ textAlign: 'center', padding: 'var(--space-xl)', color: 'var(--color-text-muted)' }}>Aucune campagne.</div>}
+        {campaigns.length === 0 && <div className="card" style={{ textAlign: 'center', padding: 'var(--space-xl)', color: 'var(--color-text-muted)' }}>Aucune campagne.</div>}
       </div>
+
+      <Pagination currentPage={currentPage} totalCount={totalCount} pageSize={pageSize} onPageChange={setPage} />
     </div>
   )
+}
+
+function buildWhere(search: string, status: StatusFilter): Record<string, unknown> {
+  const conditions: Record<string, unknown>[] = []
+  if (status !== 'all') {
+    conditions.push({ status: { _eq: status } })
+  }
+  if (search.trim()) {
+    conditions.push({ name: { _ilike: `%${search.trim()}%` } })
+  }
+  if (conditions.length === 0) return {}
+  if (conditions.length === 1) return conditions[0]
+  return { _and: conditions }
 }

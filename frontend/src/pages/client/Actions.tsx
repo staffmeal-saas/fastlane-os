@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   ListChecks,
   LayoutGrid,
@@ -9,6 +9,8 @@ import {
   ChevronUp,
 } from "lucide-react";
 import { useGraphQL } from "../../hooks/useGraphQL";
+import { usePagination } from "../../hooks/usePagination";
+import Pagination from "../../components/Pagination";
 import LoadingState from "../../components/UI/LoadingState";
 import ErrorState from "../../components/UI/ErrorState";
 import type { ActionStatus, ActionPriority } from "../../types";
@@ -64,6 +66,7 @@ interface ActionItem {
 
 interface ActionsData {
   actions: ActionItem[];
+  actions_aggregate: { aggregate: { count: number } };
 }
 
 type ViewMode = "kanban" | "list" | "timeline";
@@ -100,20 +103,33 @@ export default function Actions() {
   const [view, setView] = useState<ViewMode>("kanban");
   const [search, setSearch] = useState("");
   const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
+  const { currentPage, pageSize, offset, setPage, resetPage } = usePagination();
+
+  useEffect(() => { resetPage() }, [search, resetPage]);
+
+  const where = search.trim()
+    ? { title: { _ilike: `%${search.trim()}%` } }
+    : {};
+
+  const usesPagination = view === "list";
 
   const { data, loading, error, refetch } = useGraphQL<ActionsData>({
-    query: `query {
-      actions(order_by: { created_at: desc }) {
+    query: `query($limit: Int, $offset: Int, $where: actions_bool_exp) {
+      actions(order_by: { created_at: desc }, limit: $limit, offset: $offset, where: $where) {
         id title status priority description credits_reserved credits_consumed due_date assigned_to
         campaign { name }
       }
+      actions_aggregate(where: $where) { aggregate { count } }
     }`,
+    variables: {
+      limit: usesPagination ? pageSize : null,
+      offset: usesPagination ? offset : null,
+      where,
+    },
   });
 
   const actions = data?.actions || [];
-  const filtered = actions.filter((a) =>
-    a.title.toLowerCase().includes(search.toLowerCase()),
-  );
+  const totalCount = data?.actions_aggregate?.aggregate?.count || 0;
 
   const toggleCard = (id: string) => {
     setExpandedCards((prev) => {
@@ -136,7 +152,7 @@ export default function Actions() {
         <div>
           <h1 className="page-title">Actions en cours</h1>
           <p className="page-subtitle">
-            {actions.length} actions — suivi operationnel du delivery
+            {totalCount} actions — suivi operationnel du delivery
           </p>
         </div>
         <div style={{ display: "flex", gap: "var(--space-sm)" }}>
@@ -192,7 +208,7 @@ export default function Actions() {
       {view === "kanban" && (
         <div className="kanban-board">
           {kanbanColumns.map((col) => {
-            const colActions = filtered.filter((a) => a.status === col);
+            const colActions = actions.filter((a) => a.status === col);
             return (
               <div key={col} className="kanban-column">
                 <div className="kanban-column-header">
@@ -361,72 +377,75 @@ export default function Actions() {
       )}
 
       {view === "list" && (
-        <div className="card">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Action</th>
-                <th>Campagne</th>
-                <th>Statut</th>
-                <th>Priorite</th>
-                <th>Credits</th>
-                <th>Echeance</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((a) => (
-                <tr key={a.id}>
-                  <td style={{ fontWeight: 600 }}>{a.title}</td>
-                  <td>{a.campaign?.name || "\u2014"}</td>
-                  <td>
-                    <span
-                      className={`badge ${statusColors[a.status] || "badge-info"}`}
-                    >
-                      {statusLabels[a.status as ActionStatus] || a.status}
-                    </span>
-                  </td>
-                  <td>
-                    <span
-                      className={`badge ${priorityColors[a.priority] || "badge-info"}`}
-                    >
-                      {priorityLabels[a.priority] || a.priority}
-                    </span>
-                  </td>
-                  <td style={{ fontVariantNumeric: "tabular-nums" }}>
-                    {a.credits_reserved || 0}
-                  </td>
-                  <td>
-                    {a.due_date
-                      ? new Date(a.due_date).toLocaleDateString("fr-FR", {
-                          day: "numeric",
-                          month: "short",
-                        })
-                      : "\u2014"}
-                  </td>
-                </tr>
-              ))}
-              {filtered.length === 0 && (
+        <>
+          <div className="card">
+            <table className="data-table">
+              <thead>
                 <tr>
-                  <td
-                    colSpan={6}
-                    style={{
-                      textAlign: "center",
-                      padding: "var(--space-xl)",
-                      color: "var(--color-text-muted)",
-                    }}
-                  >
-                    Aucune action.
-                  </td>
+                  <th>Action</th>
+                  <th>Campagne</th>
+                  <th>Statut</th>
+                  <th>Priorite</th>
+                  <th>Credits</th>
+                  <th>Echeance</th>
                 </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {actions.map((a) => (
+                  <tr key={a.id}>
+                    <td style={{ fontWeight: 600 }}>{a.title}</td>
+                    <td>{a.campaign?.name || "\u2014"}</td>
+                    <td>
+                      <span
+                        className={`badge ${statusColors[a.status] || "badge-info"}`}
+                      >
+                        {statusLabels[a.status as ActionStatus] || a.status}
+                      </span>
+                    </td>
+                    <td>
+                      <span
+                        className={`badge ${priorityColors[a.priority] || "badge-info"}`}
+                      >
+                        {priorityLabels[a.priority] || a.priority}
+                      </span>
+                    </td>
+                    <td style={{ fontVariantNumeric: "tabular-nums" }}>
+                      {a.credits_reserved || 0}
+                    </td>
+                    <td>
+                      {a.due_date
+                        ? new Date(a.due_date).toLocaleDateString("fr-FR", {
+                            day: "numeric",
+                            month: "short",
+                          })
+                        : "\u2014"}
+                    </td>
+                  </tr>
+                ))}
+                {actions.length === 0 && (
+                  <tr>
+                    <td
+                      colSpan={6}
+                      style={{
+                        textAlign: "center",
+                        padding: "var(--space-xl)",
+                        color: "var(--color-text-muted)",
+                      }}
+                    >
+                      Aucune action.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+          <Pagination currentPage={currentPage} totalCount={totalCount} pageSize={pageSize} onPageChange={setPage} />
+        </>
       )}
 
       {view === "timeline" && (
         <div>
-          {filtered.length === 0 && (
+          {actions.length === 0 && (
             <div
               className="card"
               style={{
@@ -438,7 +457,7 @@ export default function Actions() {
               Aucune action.
             </div>
           )}
-          {Array.from(groupByDate(filtered)).map(([dateLabel, dateActions]) => (
+          {Array.from(groupByDate(actions)).map(([dateLabel, dateActions]) => (
             <div key={dateLabel} style={{ marginBottom: "var(--space-xl)" }}>
               <div
                 style={{

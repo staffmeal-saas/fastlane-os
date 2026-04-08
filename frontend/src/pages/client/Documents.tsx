@@ -1,7 +1,9 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { FileText, Download, Eye, Search, Grid, List } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useGraphQL } from '../../hooks/useGraphQL'
+import { usePagination } from '../../hooks/usePagination'
+import Pagination from '../../components/Pagination'
 import LoadingState from '../../components/UI/LoadingState'
 import ErrorState from '../../components/UI/ErrorState'
 import nhost from '../../lib/nhost'
@@ -16,6 +18,7 @@ interface DocumentsData {
     campaign?: { name: string }
     versions_aggregate?: { aggregate?: { count?: number } }
   }>
+  documents_aggregate: { aggregate: { count: number } }
 }
 
 type ViewMode = 'grid' | 'list'
@@ -25,21 +28,26 @@ export default function Documents() {
   const [search, setSearch] = useState('')
   const [typeFilter, setTypeFilter] = useState('all')
   const [viewMode, setViewMode] = useState<ViewMode>('grid')
+  const { currentPage, pageSize, offset, setPage, resetPage } = usePagination()
+
+  useEffect(() => { resetPage() }, [search, typeFilter, resetPage])
+
+  const where = buildWhere(search, typeFilter)
 
   const { data, loading, error, refetch } = useGraphQL<DocumentsData>({
-    query: `query {
-      documents(where: {is_published: {_eq: true}}, order_by: {created_at: desc}) {
+    query: `query($limit: Int!, $offset: Int!, $where: documents_bool_exp) {
+      documents(where: $where, order_by: {created_at: desc}, limit: $limit, offset: $offset) {
         id title type description is_published created_at file_size file_id
         campaign { name }
         versions_aggregate { aggregate { count } }
       }
-    }`
+      documents_aggregate(where: $where) { aggregate { count } }
+    }`,
+    variables: { limit: pageSize, offset, where }
   })
 
   const documents = data?.documents || []
-  const filtered = documents
-    .filter(d => typeFilter === 'all' || d.type === typeFilter)
-    .filter(d => d.title.toLowerCase().includes(search.toLowerCase()))
+  const totalCount = data?.documents_aggregate?.aggregate?.count || 0
 
   if (loading) return <LoadingState />
   if (error) return <ErrorState message={error} onRetry={refetch} />
@@ -71,7 +79,7 @@ export default function Documents() {
       <div className="page-header">
         <div>
           <h1 className="page-title">Documents & Livrables</h1>
-          <p className="page-subtitle">{documents.length} documents</p>
+          <p className="page-subtitle">{totalCount} documents</p>
         </div>
         <div style={{ display: 'flex', gap: 'var(--space-sm)' }}>
           <button className={`btn ${viewMode === 'grid' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setViewMode('grid')}><Grid size={16} /></button>
@@ -92,7 +100,7 @@ export default function Documents() {
 
       {viewMode === 'grid' ? (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 'var(--space-md)' }}>
-          {filtered.map(doc => (
+          {documents.map(doc => (
             <div key={doc.id} className="card" style={{ cursor: 'pointer' }}>
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--space-md)', marginBottom: 'var(--space-md)' }}>
                 <div style={{ width: 48, height: 48, borderRadius: 'var(--radius-md)', background: 'var(--color-danger-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-danger)', fontWeight: 800, fontSize: '0.8rem', flexShrink: 0 }}>PDF</div>
@@ -112,14 +120,14 @@ export default function Documents() {
               </div>
             </div>
           ))}
-          {filtered.length === 0 && <div className="card" style={{ gridColumn: '1 / -1', textAlign: 'center', padding: 'var(--space-xl)', color: 'var(--color-text-muted)' }}>Aucun document.</div>}
+          {documents.length === 0 && <div className="card" style={{ gridColumn: '1 / -1', textAlign: 'center', padding: 'var(--space-xl)', color: 'var(--color-text-muted)' }}>Aucun document.</div>}
         </div>
       ) : (
         <div className="card">
           <table className="data-table">
             <thead><tr><th>Document</th><th>Type</th><th>Campagne</th><th>Date</th><th>Taille</th><th>Actions</th></tr></thead>
             <tbody>
-              {filtered.map(doc => (
+              {documents.map(doc => (
                 <tr key={doc.id}>
                   <td style={{ fontWeight: 600 }}>{doc.title}</td>
                   <td><span className={`badge ${typeColors[doc.type] || 'badge-info'}`}>{typeLabels[doc.type] || doc.type}</span></td>
@@ -129,11 +137,25 @@ export default function Documents() {
                   <td><div style={{ display: 'flex', gap: 'var(--space-xs)' }}><button className="btn btn-sm btn-ghost" onClick={() => handleView(doc)} disabled={!doc.file_id}><Eye size={14} /></button><button className="btn btn-sm btn-ghost" onClick={() => handleDownload(doc)} disabled={!doc.file_id}><Download size={14} /></button></div></td>
                 </tr>
               ))}
-              {filtered.length === 0 && <tr><td colSpan={6} style={{ textAlign: 'center', padding: 'var(--space-xl)', color: 'var(--color-text-muted)' }}>Aucun document.</td></tr>}
+              {documents.length === 0 && <tr><td colSpan={6} style={{ textAlign: 'center', padding: 'var(--space-xl)', color: 'var(--color-text-muted)' }}>Aucun document.</td></tr>}
             </tbody>
           </table>
         </div>
       )}
+
+      <Pagination currentPage={currentPage} totalCount={totalCount} pageSize={pageSize} onPageChange={setPage} />
     </div>
   )
+}
+
+function buildWhere(search: string, typeFilter: string): Record<string, unknown> {
+  const conditions: Record<string, unknown>[] = [{ is_published: { _eq: true } }]
+  if (typeFilter !== 'all') {
+    conditions.push({ type: { _eq: typeFilter } })
+  }
+  if (search.trim()) {
+    conditions.push({ title: { _ilike: `%${search.trim()}%` } })
+  }
+  if (conditions.length === 1) return conditions[0]
+  return { _and: conditions }
 }
