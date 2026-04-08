@@ -1,47 +1,907 @@
 {
-  sources:
-  [
+  "version": 3,
+  "sources": [
     {
-      configuration:
-      {
-        connection_info:
-        {
-          database_url:
-          {
-            from_env: ...
-          }
-          isolation_level: string,
-          pool_settings:
-          {
-            connection_lifetime: ...,
-            idle_timeout: ...,
-            max_connections: ...,
-            retries: ...
-          }
-          use_prepared_statements: bool
+      "name": "default",
+      "kind": "postgres",
+      "configuration": {
+        "connection_info": {
+          "database_url": {
+            "from_env": "HASURA_GRAPHQL_DATABASE_URL"
+          },
+          "isolation_level": "read-committed",
+          "pool_settings": {
+            "connection_lifetime": 600,
+            "idle_timeout": 180,
+            "max_connections": 50,
+            "retries": 1
+          },
+          "use_prepared_statements": true
         }
-      }
-      kind: string,
-      name: string,
-      tables:
-      [{
-          configuration:
-          {
-            column_config:
-            ...
-            custom_column_names:
-            ...
-            custom_name: ...,
-            custom_root_fields:
-            ...
-          }
-          table:
-          {
-            name: ...,
-            schema: ...
-          }
-        }] (26)
+      },
+      "tables": [
+        {
+          "table": { "name": "offers", "schema": "public" },
+          "array_relationships": [
+            {
+              "name": "clients",
+              "using": { "foreign_key_constraint_on": { "column": "offer_id", "table": { "name": "clients", "schema": "public" } } }
+            }
+          ],
+          "select_permissions": [
+            { "role": "super_admin", "permission": { "columns": "*", "filter": {} } },
+            { "role": "admin_ops", "permission": { "columns": "*", "filter": {} } },
+            { "role": "account_manager", "permission": { "columns": "*", "filter": {} } },
+            { "role": "sprint_manager", "permission": { "columns": "*", "filter": {} } },
+            { "role": "finance_admin", "permission": { "columns": "*", "filter": {} } }
+          ],
+          "insert_permissions": [
+            { "role": "super_admin", "permission": { "columns": "*", "check": {} } },
+            { "role": "admin_ops", "permission": { "columns": "*", "check": {} } }
+          ],
+          "update_permissions": [
+            { "role": "super_admin", "permission": { "columns": "*", "filter": {} } },
+            { "role": "admin_ops", "permission": { "columns": "*", "filter": {} } }
+          ],
+          "delete_permissions": [
+            { "role": "super_admin", "permission": { "filter": {} } },
+            { "role": "admin_ops", "permission": { "filter": {} } }
+          ]
+        },
+        {
+          "table": { "name": "clients", "schema": "public" },
+          "object_relationships": [
+            {
+              "name": "offer",
+              "using": { "foreign_key_constraint_on": "offer_id" }
+            }
+          ],
+          "array_relationships": [
+            {
+              "name": "client_members",
+              "using": { "foreign_key_constraint_on": { "column": "client_id", "table": { "name": "client_members", "schema": "public" } } }
+            },
+            {
+              "name": "wallets",
+              "using": { "foreign_key_constraint_on": { "column": "client_id", "table": { "name": "wallets", "schema": "public" } } }
+            },
+            {
+              "name": "campaigns",
+              "using": { "foreign_key_constraint_on": { "column": "client_id", "table": { "name": "campaigns", "schema": "public" } } }
+            },
+            {
+              "name": "actions",
+              "using": { "foreign_key_constraint_on": { "column": "client_id", "table": { "name": "actions", "schema": "public" } } }
+            },
+            {
+              "name": "strategic_blocks",
+              "using": { "foreign_key_constraint_on": { "column": "client_id", "table": { "name": "strategic_blocks", "schema": "public" } } }
+            },
+            {
+              "name": "documents",
+              "using": { "foreign_key_constraint_on": { "column": "client_id", "table": { "name": "documents", "schema": "public" } } }
+            },
+            {
+              "name": "upgrades",
+              "using": { "foreign_key_constraint_on": { "column": "client_id", "table": { "name": "upgrades", "schema": "public" } } }
+            },
+            {
+              "name": "notifications",
+              "using": { "foreign_key_constraint_on": { "column": "client_id", "table": { "name": "notifications", "schema": "public" } } }
+            }
+          ],
+          "select_permissions": [
+            { "role": "super_admin", "permission": { "columns": "*", "filter": {} } },
+            { "role": "admin_ops", "permission": { "columns": "*", "filter": {} } },
+            { "role": "account_manager", "permission": { "columns": "*", "filter": {} } },
+            {
+              "role": "sprint_manager",
+              "permission": {
+                "columns": "*",
+                "filter": { "status": { "_eq": "sprint" } }
+              }
+            },
+            { "role": "finance_admin", "permission": { "columns": "*", "filter": {} } },
+            {
+              "role": "client_owner",
+              "permission": {
+                "columns": "*",
+                "filter": {
+                  "client_members": { "user_id": { "_eq": "X-Hasura-User-Id" } }
+                }
+              }
+            },
+            {
+              "role": "client_collaborator",
+              "permission": {
+                "columns": "*",
+                "filter": {
+                  "client_members": { "user_id": { "_eq": "X-Hasura-User-Id" } }
+                }
+              }
+            },
+            {
+              "role": "prospect_sprint",
+              "permission": {
+                "columns": "*",
+                "filter": {
+                  "_and": [
+                    { "client_members": { "user_id": { "_eq": "X-Hasura-User-Id" } } },
+                    { "status": { "_eq": "sprint" } }
+                  ]
+                }
+              }
+            }
+          ],
+          "insert_permissions": [
+            { "role": "super_admin", "permission": { "columns": "*", "check": {} } },
+            { "role": "admin_ops", "permission": { "columns": "*", "check": {} } }
+          ],
+          "update_permissions": [
+            { "role": "super_admin", "permission": { "columns": "*", "filter": {} } },
+            { "role": "admin_ops", "permission": { "columns": "*", "filter": {} } },
+            {
+              "role": "account_manager",
+              "permission": {
+                "columns": ["name", "logo_url", "status", "offer_id", "industry", "website", "notes"],
+                "filter": {}
+              }
+            },
+            {
+              "role": "sprint_manager",
+              "permission": {
+                "columns": ["name", "logo_url", "status", "industry", "website", "notes"],
+                "filter": { "status": { "_eq": "sprint" } }
+              }
+            }
+          ],
+          "delete_permissions": [
+            { "role": "super_admin", "permission": { "filter": {} } },
+            { "role": "admin_ops", "permission": { "filter": {} } }
+          ]
+        },
+        {
+          "table": { "name": "client_members", "schema": "public" },
+          "object_relationships": [
+            {
+              "name": "client",
+              "using": { "foreign_key_constraint_on": "client_id" }
+            }
+          ],
+          "select_permissions": [
+            { "role": "super_admin", "permission": { "columns": "*", "filter": {} } },
+            { "role": "admin_ops", "permission": { "columns": "*", "filter": {} } },
+            { "role": "account_manager", "permission": { "columns": "*", "filter": {} } },
+            { "role": "finance_admin", "permission": { "columns": "*", "filter": {} } }
+          ],
+          "insert_permissions": [
+            { "role": "super_admin", "permission": { "columns": "*", "check": {} } },
+            { "role": "admin_ops", "permission": { "columns": "*", "check": {} } }
+          ],
+          "update_permissions": [
+            { "role": "super_admin", "permission": { "columns": "*", "filter": {} } },
+            { "role": "admin_ops", "permission": { "columns": "*", "filter": {} } }
+          ],
+          "delete_permissions": [
+            { "role": "super_admin", "permission": { "filter": {} } },
+            { "role": "admin_ops", "permission": { "filter": {} } }
+          ]
+        },
+        {
+          "table": { "name": "wallets", "schema": "public" },
+          "object_relationships": [
+            {
+              "name": "client",
+              "using": { "foreign_key_constraint_on": "client_id" }
+            }
+          ],
+          "array_relationships": [
+            {
+              "name": "wallet_transactions",
+              "using": { "foreign_key_constraint_on": { "column": "wallet_id", "table": { "name": "wallet_transactions", "schema": "public" } } }
+            },
+            {
+              "name": "upgrades",
+              "using": { "foreign_key_constraint_on": { "column": "wallet_id", "table": { "name": "upgrades", "schema": "public" } } }
+            }
+          ],
+          "select_permissions": [
+            { "role": "super_admin", "permission": { "columns": "*", "filter": {} } },
+            { "role": "admin_ops", "permission": { "columns": "*", "filter": {} } },
+            { "role": "account_manager", "permission": { "columns": "*", "filter": {} } },
+            { "role": "sprint_manager", "permission": { "columns": "*", "filter": {} } },
+            { "role": "finance_admin", "permission": { "columns": "*", "filter": {} } },
+            {
+              "role": "client_owner",
+              "permission": {
+                "columns": "*",
+                "filter": {
+                  "client": { "client_members": { "user_id": { "_eq": "X-Hasura-User-Id" } } }
+                }
+              }
+            }
+          ],
+          "insert_permissions": [
+            { "role": "super_admin", "permission": { "columns": "*", "check": {} } },
+            { "role": "admin_ops", "permission": { "columns": "*", "check": {} } },
+            { "role": "finance_admin", "permission": { "columns": "*", "check": {} } }
+          ],
+          "update_permissions": [
+            { "role": "super_admin", "permission": { "columns": "*", "filter": {} } },
+            { "role": "admin_ops", "permission": { "columns": "*", "filter": {} } },
+            {
+              "role": "finance_admin",
+              "permission": {
+                "columns": ["balance", "reserved", "carried_over"],
+                "filter": {}
+              }
+            }
+          ],
+          "delete_permissions": [
+            { "role": "super_admin", "permission": { "filter": {} } },
+            { "role": "admin_ops", "permission": { "filter": {} } }
+          ]
+        },
+        {
+          "table": { "name": "wallet_transactions", "schema": "public" },
+          "object_relationships": [
+            {
+              "name": "wallet",
+              "using": { "foreign_key_constraint_on": "wallet_id" }
+            },
+            {
+              "name": "client",
+              "using": { "foreign_key_constraint_on": "client_id" }
+            }
+          ],
+          "select_permissions": [
+            { "role": "super_admin", "permission": { "columns": "*", "filter": {} } },
+            { "role": "admin_ops", "permission": { "columns": "*", "filter": {} } },
+            { "role": "account_manager", "permission": { "columns": "*", "filter": {} } },
+            { "role": "sprint_manager", "permission": { "columns": "*", "filter": {} } },
+            { "role": "finance_admin", "permission": { "columns": "*", "filter": {} } },
+            {
+              "role": "client_owner",
+              "permission": {
+                "columns": "*",
+                "filter": {
+                  "client": { "client_members": { "user_id": { "_eq": "X-Hasura-User-Id" } } }
+                }
+              }
+            }
+          ],
+          "insert_permissions": [
+            { "role": "super_admin", "permission": { "columns": "*", "check": {} } },
+            { "role": "admin_ops", "permission": { "columns": "*", "check": {} } },
+            { "role": "finance_admin", "permission": { "columns": "*", "check": {} } }
+          ],
+          "update_permissions": [
+            { "role": "super_admin", "permission": { "columns": "*", "filter": {} } },
+            { "role": "admin_ops", "permission": { "columns": "*", "filter": {} } },
+            {
+              "role": "finance_admin",
+              "permission": {
+                "columns": ["type", "amount", "balance_after", "description", "reference_id", "reference_type"],
+                "filter": {}
+              }
+            }
+          ],
+          "delete_permissions": [
+            { "role": "super_admin", "permission": { "filter": {} } },
+            { "role": "admin_ops", "permission": { "filter": {} } }
+          ]
+        },
+        {
+          "table": { "name": "campaigns", "schema": "public" },
+          "object_relationships": [
+            {
+              "name": "client",
+              "using": { "foreign_key_constraint_on": "client_id" }
+            }
+          ],
+          "array_relationships": [
+            {
+              "name": "actions",
+              "using": { "foreign_key_constraint_on": { "column": "campaign_id", "table": { "name": "actions", "schema": "public" } } }
+            },
+            {
+              "name": "documents",
+              "using": { "foreign_key_constraint_on": { "column": "campaign_id", "table": { "name": "documents", "schema": "public" } } }
+            },
+            {
+              "name": "upgrades",
+              "using": { "foreign_key_constraint_on": { "column": "campaign_id", "table": { "name": "upgrades", "schema": "public" } } }
+            }
+          ],
+          "select_permissions": [
+            { "role": "super_admin", "permission": { "columns": "*", "filter": {} } },
+            { "role": "admin_ops", "permission": { "columns": "*", "filter": {} } },
+            { "role": "account_manager", "permission": { "columns": "*", "filter": {} } },
+            { "role": "sprint_manager", "permission": { "columns": "*", "filter": {} } },
+            { "role": "finance_admin", "permission": { "columns": "*", "filter": {} } },
+            {
+              "role": "client_owner",
+              "permission": {
+                "columns": "*",
+                "filter": {
+                  "client": { "client_members": { "user_id": { "_eq": "X-Hasura-User-Id" } } }
+                }
+              }
+            },
+            {
+              "role": "client_collaborator",
+              "permission": {
+                "columns": "*",
+                "filter": {
+                  "client": { "client_members": { "user_id": { "_eq": "X-Hasura-User-Id" } } }
+                }
+              }
+            },
+            {
+              "role": "prospect_sprint",
+              "permission": {
+                "columns": "*",
+                "filter": {
+                  "client": { "client_members": { "user_id": { "_eq": "X-Hasura-User-Id" } } }
+                }
+              }
+            }
+          ],
+          "insert_permissions": [
+            { "role": "super_admin", "permission": { "columns": "*", "check": {} } },
+            { "role": "admin_ops", "permission": { "columns": "*", "check": {} } }
+          ],
+          "update_permissions": [
+            { "role": "super_admin", "permission": { "columns": "*", "filter": {} } },
+            { "role": "admin_ops", "permission": { "columns": "*", "filter": {} } },
+            {
+              "role": "account_manager",
+              "permission": {
+                "columns": ["name", "description", "objectives", "status", "start_date", "end_date", "kpi_targets", "kpi_results", "credits_budget", "credits_consumed", "owner_user_id"],
+                "filter": {}
+              }
+            },
+            {
+              "role": "sprint_manager",
+              "permission": {
+                "columns": ["name", "description", "objectives", "status", "start_date", "end_date", "kpi_targets", "kpi_results", "credits_budget", "credits_consumed", "owner_user_id"],
+                "filter": {}
+              }
+            }
+          ],
+          "delete_permissions": [
+            { "role": "super_admin", "permission": { "filter": {} } },
+            { "role": "admin_ops", "permission": { "filter": {} } }
+          ]
+        },
+        {
+          "table": { "name": "actions", "schema": "public" },
+          "object_relationships": [
+            {
+              "name": "campaign",
+              "using": { "foreign_key_constraint_on": "campaign_id" }
+            },
+            {
+              "name": "client",
+              "using": { "foreign_key_constraint_on": "client_id" }
+            }
+          ],
+          "array_relationships": [
+            {
+              "name": "action_status_history",
+              "using": { "foreign_key_constraint_on": { "column": "action_id", "table": { "name": "action_status_history", "schema": "public" } } }
+            }
+          ],
+          "select_permissions": [
+            { "role": "super_admin", "permission": { "columns": "*", "filter": {} } },
+            { "role": "admin_ops", "permission": { "columns": "*", "filter": {} } },
+            { "role": "account_manager", "permission": { "columns": "*", "filter": {} } },
+            { "role": "sprint_manager", "permission": { "columns": "*", "filter": {} } },
+            { "role": "finance_admin", "permission": { "columns": "*", "filter": {} } },
+            {
+              "role": "client_owner",
+              "permission": {
+                "columns": "*",
+                "filter": {
+                  "client": { "client_members": { "user_id": { "_eq": "X-Hasura-User-Id" } } }
+                }
+              }
+            },
+            {
+              "role": "client_collaborator",
+              "permission": {
+                "columns": "*",
+                "filter": {
+                  "client": { "client_members": { "user_id": { "_eq": "X-Hasura-User-Id" } } }
+                }
+              }
+            },
+            {
+              "role": "prospect_sprint",
+              "permission": {
+                "columns": "*",
+                "filter": {
+                  "client": { "client_members": { "user_id": { "_eq": "X-Hasura-User-Id" } } }
+                }
+              }
+            }
+          ],
+          "insert_permissions": [
+            { "role": "super_admin", "permission": { "columns": "*", "check": {} } },
+            { "role": "admin_ops", "permission": { "columns": "*", "check": {} } },
+            {
+              "role": "account_manager",
+              "permission": {
+                "columns": ["campaign_id", "client_id", "title", "description", "status", "priority", "credits_reserved", "assigned_to", "due_date"],
+                "check": {}
+              }
+            },
+            {
+              "role": "sprint_manager",
+              "permission": {
+                "columns": ["campaign_id", "client_id", "title", "description", "status", "priority", "credits_reserved", "assigned_to", "due_date"],
+                "check": {}
+              }
+            }
+          ],
+          "update_permissions": [
+            { "role": "super_admin", "permission": { "columns": "*", "filter": {} } },
+            { "role": "admin_ops", "permission": { "columns": "*", "filter": {} } },
+            {
+              "role": "account_manager",
+              "permission": {
+                "columns": ["title", "description", "status", "priority", "credits_reserved", "credits_consumed", "assigned_to", "due_date", "completed_at"],
+                "filter": {}
+              }
+            },
+            {
+              "role": "sprint_manager",
+              "permission": {
+                "columns": ["title", "description", "status", "priority", "credits_reserved", "credits_consumed", "assigned_to", "due_date", "completed_at"],
+                "filter": {}
+              }
+            }
+          ],
+          "delete_permissions": [
+            { "role": "super_admin", "permission": { "filter": {} } },
+            { "role": "admin_ops", "permission": { "filter": {} } }
+          ]
+        },
+        {
+          "table": { "name": "action_status_history", "schema": "public" },
+          "object_relationships": [
+            {
+              "name": "action",
+              "using": { "foreign_key_constraint_on": "action_id" }
+            },
+            {
+              "name": "client",
+              "using": { "foreign_key_constraint_on": "client_id" }
+            }
+          ],
+          "select_permissions": [
+            { "role": "super_admin", "permission": { "columns": "*", "filter": {} } },
+            { "role": "admin_ops", "permission": { "columns": "*", "filter": {} } },
+            { "role": "account_manager", "permission": { "columns": "*", "filter": {} } },
+            { "role": "sprint_manager", "permission": { "columns": "*", "filter": {} } },
+            { "role": "finance_admin", "permission": { "columns": "*", "filter": {} } },
+            {
+              "role": "client_owner",
+              "permission": {
+                "columns": "*",
+                "filter": {
+                  "client": { "client_members": { "user_id": { "_eq": "X-Hasura-User-Id" } } }
+                }
+              }
+            },
+            {
+              "role": "client_collaborator",
+              "permission": {
+                "columns": "*",
+                "filter": {
+                  "client": { "client_members": { "user_id": { "_eq": "X-Hasura-User-Id" } } }
+                }
+              }
+            }
+          ],
+          "insert_permissions": [
+            { "role": "super_admin", "permission": { "columns": "*", "check": {} } },
+            { "role": "admin_ops", "permission": { "columns": "*", "check": {} } }
+          ],
+          "update_permissions": [
+            { "role": "super_admin", "permission": { "columns": "*", "filter": {} } },
+            { "role": "admin_ops", "permission": { "columns": "*", "filter": {} } }
+          ],
+          "delete_permissions": [
+            { "role": "super_admin", "permission": { "filter": {} } },
+            { "role": "admin_ops", "permission": { "filter": {} } }
+          ]
+        },
+        {
+          "table": { "name": "strategic_blocks", "schema": "public" },
+          "object_relationships": [
+            {
+              "name": "client",
+              "using": { "foreign_key_constraint_on": "client_id" }
+            }
+          ],
+          "array_relationships": [
+            {
+              "name": "documents",
+              "using": { "foreign_key_constraint_on": { "column": "strategic_block_id", "table": { "name": "documents", "schema": "public" } } }
+            }
+          ],
+          "select_permissions": [
+            { "role": "super_admin", "permission": { "columns": "*", "filter": {} } },
+            { "role": "admin_ops", "permission": { "columns": "*", "filter": {} } },
+            { "role": "account_manager", "permission": { "columns": "*", "filter": {} } },
+            { "role": "finance_admin", "permission": { "columns": "*", "filter": {} } },
+            {
+              "role": "client_owner",
+              "permission": {
+                "columns": "*",
+                "filter": {
+                  "client": { "client_members": { "user_id": { "_eq": "X-Hasura-User-Id" } } }
+                }
+              }
+            },
+            {
+              "role": "client_collaborator",
+              "permission": {
+                "columns": "*",
+                "filter": {
+                  "client": { "client_members": { "user_id": { "_eq": "X-Hasura-User-Id" } } }
+                }
+              }
+            }
+          ],
+          "insert_permissions": [
+            { "role": "super_admin", "permission": { "columns": "*", "check": {} } },
+            { "role": "admin_ops", "permission": { "columns": "*", "check": {} } }
+          ],
+          "update_permissions": [
+            { "role": "super_admin", "permission": { "columns": "*", "filter": {} } },
+            { "role": "admin_ops", "permission": { "columns": "*", "filter": {} } },
+            {
+              "role": "account_manager",
+              "permission": {
+                "columns": ["name", "category", "description", "objectives", "kpi_targets", "sort_order"],
+                "filter": {}
+              }
+            }
+          ],
+          "delete_permissions": [
+            { "role": "super_admin", "permission": { "filter": {} } },
+            { "role": "admin_ops", "permission": { "filter": {} } }
+          ]
+        },
+        {
+          "table": { "name": "documents", "schema": "public" },
+          "object_relationships": [
+            {
+              "name": "client",
+              "using": { "foreign_key_constraint_on": "client_id" }
+            },
+            {
+              "name": "campaign",
+              "using": { "foreign_key_constraint_on": "campaign_id" }
+            },
+            {
+              "name": "strategic_block",
+              "using": { "foreign_key_constraint_on": "strategic_block_id" }
+            }
+          ],
+          "array_relationships": [
+            {
+              "name": "document_versions",
+              "using": { "foreign_key_constraint_on": { "column": "document_id", "table": { "name": "document_versions", "schema": "public" } } }
+            }
+          ],
+          "select_permissions": [
+            { "role": "super_admin", "permission": { "columns": "*", "filter": {} } },
+            { "role": "admin_ops", "permission": { "columns": "*", "filter": {} } },
+            { "role": "account_manager", "permission": { "columns": "*", "filter": {} } },
+            { "role": "finance_admin", "permission": { "columns": "*", "filter": {} } },
+            {
+              "role": "client_owner",
+              "permission": {
+                "columns": "*",
+                "filter": {
+                  "_and": [
+                    { "client": { "client_members": { "user_id": { "_eq": "X-Hasura-User-Id" } } } },
+                    { "is_published": { "_eq": true } }
+                  ]
+                }
+              }
+            },
+            {
+              "role": "client_collaborator",
+              "permission": {
+                "columns": "*",
+                "filter": {
+                  "_and": [
+                    { "client": { "client_members": { "user_id": { "_eq": "X-Hasura-User-Id" } } } },
+                    { "is_published": { "_eq": true } }
+                  ]
+                }
+              }
+            },
+            {
+              "role": "prospect_sprint",
+              "permission": {
+                "columns": "*",
+                "filter": {
+                  "_and": [
+                    { "client": { "client_members": { "user_id": { "_eq": "X-Hasura-User-Id" } } } },
+                    { "is_published": { "_eq": true } }
+                  ]
+                }
+              }
+            }
+          ],
+          "insert_permissions": [
+            { "role": "super_admin", "permission": { "columns": "*", "check": {} } },
+            { "role": "admin_ops", "permission": { "columns": "*", "check": {} } },
+            {
+              "role": "account_manager",
+              "permission": {
+                "columns": ["client_id", "campaign_id", "strategic_block_id", "title", "type", "description", "file_id", "file_url", "file_size", "is_published", "published_at", "published_by"],
+                "check": {}
+              }
+            }
+          ],
+          "update_permissions": [
+            { "role": "super_admin", "permission": { "columns": "*", "filter": {} } },
+            { "role": "admin_ops", "permission": { "columns": "*", "filter": {} } },
+            {
+              "role": "account_manager",
+              "permission": {
+                "columns": ["title", "type", "description", "file_id", "file_url", "file_size", "is_published", "published_at", "published_by", "campaign_id", "strategic_block_id"],
+                "filter": {}
+              }
+            }
+          ],
+          "delete_permissions": [
+            { "role": "super_admin", "permission": { "filter": {} } },
+            { "role": "admin_ops", "permission": { "filter": {} } }
+          ]
+        },
+        {
+          "table": { "name": "document_versions", "schema": "public" },
+          "object_relationships": [
+            {
+              "name": "document",
+              "using": { "foreign_key_constraint_on": "document_id" }
+            },
+            {
+              "name": "client",
+              "using": { "foreign_key_constraint_on": "client_id" }
+            }
+          ],
+          "select_permissions": [
+            { "role": "super_admin", "permission": { "columns": "*", "filter": {} } },
+            { "role": "admin_ops", "permission": { "columns": "*", "filter": {} } },
+            { "role": "account_manager", "permission": { "columns": "*", "filter": {} } },
+            { "role": "finance_admin", "permission": { "columns": "*", "filter": {} } },
+            {
+              "role": "client_owner",
+              "permission": {
+                "columns": "*",
+                "filter": {
+                  "document": {
+                    "_and": [
+                      { "client": { "client_members": { "user_id": { "_eq": "X-Hasura-User-Id" } } } },
+                      { "is_published": { "_eq": true } }
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "role": "client_collaborator",
+              "permission": {
+                "columns": "*",
+                "filter": {
+                  "document": {
+                    "_and": [
+                      { "client": { "client_members": { "user_id": { "_eq": "X-Hasura-User-Id" } } } },
+                      { "is_published": { "_eq": true } }
+                    ]
+                  }
+                }
+              }
+            }
+          ],
+          "insert_permissions": [
+            { "role": "super_admin", "permission": { "columns": "*", "check": {} } },
+            { "role": "admin_ops", "permission": { "columns": "*", "check": {} } }
+          ],
+          "update_permissions": [
+            { "role": "super_admin", "permission": { "columns": "*", "filter": {} } },
+            { "role": "admin_ops", "permission": { "columns": "*", "filter": {} } }
+          ],
+          "delete_permissions": [
+            { "role": "super_admin", "permission": { "filter": {} } },
+            { "role": "admin_ops", "permission": { "filter": {} } }
+          ]
+        },
+        {
+          "table": { "name": "upgrades", "schema": "public" },
+          "object_relationships": [
+            {
+              "name": "client",
+              "using": { "foreign_key_constraint_on": "client_id" }
+            },
+            {
+              "name": "wallet",
+              "using": { "foreign_key_constraint_on": "wallet_id" }
+            },
+            {
+              "name": "campaign",
+              "using": { "foreign_key_constraint_on": "campaign_id" }
+            }
+          ],
+          "select_permissions": [
+            { "role": "super_admin", "permission": { "columns": "*", "filter": {} } },
+            { "role": "admin_ops", "permission": { "columns": "*", "filter": {} } },
+            { "role": "account_manager", "permission": { "columns": "*", "filter": {} } },
+            { "role": "finance_admin", "permission": { "columns": "*", "filter": {} } },
+            {
+              "role": "client_owner",
+              "permission": {
+                "columns": "*",
+                "filter": {
+                  "client": { "client_members": { "user_id": { "_eq": "X-Hasura-User-Id" } } }
+                }
+              }
+            }
+          ],
+          "insert_permissions": [
+            { "role": "super_admin", "permission": { "columns": "*", "check": {} } },
+            { "role": "admin_ops", "permission": { "columns": "*", "check": {} } },
+            { "role": "finance_admin", "permission": { "columns": "*", "check": {} } },
+            {
+              "role": "client_owner",
+              "permission": {
+                "columns": ["client_id", "wallet_id", "campaign_id", "credits_amount", "pack_type", "allocation_target", "notes"],
+                "check": {
+                  "client": { "client_members": { "user_id": { "_eq": "X-Hasura-User-Id" } } }
+                }
+              }
+            }
+          ],
+          "update_permissions": [
+            { "role": "super_admin", "permission": { "columns": "*", "filter": {} } },
+            { "role": "admin_ops", "permission": { "columns": "*", "filter": {} } },
+            {
+              "role": "finance_admin",
+              "permission": {
+                "columns": ["status", "validated_by", "validated_at", "paid_at", "credited_at", "notes"],
+                "filter": {}
+              }
+            }
+          ],
+          "delete_permissions": [
+            { "role": "super_admin", "permission": { "filter": {} } },
+            { "role": "admin_ops", "permission": { "filter": {} } }
+          ]
+        },
+        {
+          "table": { "name": "notifications", "schema": "public" },
+          "object_relationships": [
+            {
+              "name": "client",
+              "using": { "foreign_key_constraint_on": "client_id" }
+            }
+          ],
+          "select_permissions": [
+            { "role": "super_admin", "permission": { "columns": "*", "filter": {} } },
+            { "role": "admin_ops", "permission": { "columns": "*", "filter": {} } },
+            { "role": "finance_admin", "permission": { "columns": "*", "filter": {} } },
+            {
+              "role": "account_manager",
+              "permission": {
+                "columns": "*",
+                "filter": {}
+              }
+            },
+            {
+              "role": "sprint_manager",
+              "permission": {
+                "columns": "*",
+                "filter": {}
+              }
+            },
+            {
+              "role": "client_owner",
+              "permission": {
+                "columns": "*",
+                "filter": { "user_id": { "_eq": "X-Hasura-User-Id" } }
+              }
+            },
+            {
+              "role": "client_collaborator",
+              "permission": {
+                "columns": "*",
+                "filter": { "user_id": { "_eq": "X-Hasura-User-Id" } }
+              }
+            },
+            {
+              "role": "prospect_sprint",
+              "permission": {
+                "columns": "*",
+                "filter": { "user_id": { "_eq": "X-Hasura-User-Id" } }
+              }
+            }
+          ],
+          "insert_permissions": [
+            { "role": "super_admin", "permission": { "columns": "*", "check": {} } },
+            { "role": "admin_ops", "permission": { "columns": "*", "check": {} } },
+            {
+              "role": "account_manager",
+              "permission": {
+                "columns": ["user_id", "client_id", "title", "message", "type", "link"],
+                "check": {}
+              }
+            },
+            {
+              "role": "sprint_manager",
+              "permission": {
+                "columns": ["user_id", "client_id", "title", "message", "type", "link"],
+                "check": {}
+              }
+            }
+          ],
+          "update_permissions": [
+            { "role": "super_admin", "permission": { "columns": "*", "filter": {} } },
+            { "role": "admin_ops", "permission": { "columns": "*", "filter": {} } },
+            {
+              "role": "client_owner",
+              "permission": {
+                "columns": ["is_read"],
+                "filter": { "user_id": { "_eq": "X-Hasura-User-Id" } }
+              }
+            },
+            {
+              "role": "client_collaborator",
+              "permission": {
+                "columns": ["is_read"],
+                "filter": { "user_id": { "_eq": "X-Hasura-User-Id" } }
+              }
+            },
+            {
+              "role": "prospect_sprint",
+              "permission": {
+                "columns": ["is_read"],
+                "filter": { "user_id": { "_eq": "X-Hasura-User-Id" } }
+              }
+            }
+          ],
+          "delete_permissions": [
+            { "role": "super_admin", "permission": { "filter": {} } },
+            { "role": "admin_ops", "permission": { "filter": {} } }
+          ]
+        },
+        {
+          "table": { "name": "user_profiles", "schema": "public" },
+          "select_permissions": [
+            { "role": "super_admin", "permission": { "columns": "*", "filter": {} } },
+            { "role": "admin_ops", "permission": { "columns": "*", "filter": {} } },
+            { "role": "account_manager", "permission": { "columns": "*", "filter": {} } },
+            { "role": "finance_admin", "permission": { "columns": "*", "filter": {} } }
+          ],
+          "insert_permissions": [
+            { "role": "super_admin", "permission": { "columns": "*", "check": {} } },
+            { "role": "admin_ops", "permission": { "columns": ["user_id", "display_name", "phone", "avatar_url"], "check": {} } }
+          ],
+          "update_permissions": [
+            { "role": "super_admin", "permission": { "columns": "*", "filter": {} } }
+          ],
+          "delete_permissions": [
+            { "role": "super_admin", "permission": { "filter": {} } }
+          ]
+        }
+      ]
     }
   ]
-  version: int
 }
