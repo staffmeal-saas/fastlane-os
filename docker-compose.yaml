@@ -92,9 +92,9 @@ services:
             - "4000:4000"
         volumes:
             - type: bind
-              source: /tmp/fastlane-nhost/emails
+              source: ./emails
               target: /app/email-templates
-              read_only: false
+              read_only: true
 
     console:
         image: nhost/graphql-engine:v2.46.0-ce.cli-migrations-v3
