@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Plus,
   Search,
@@ -10,6 +10,8 @@ import {
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useGraphQL, useLazyGraphQL } from "../../hooks/useGraphQL";
+import { usePagination } from "../../hooks/usePagination";
+import Pagination from "../../components/Pagination";
 import LoadingState from "../../components/UI/LoadingState";
 import ErrorState from "../../components/UI/ErrorState";
 import type { ClientStatus } from "../../types";
@@ -28,6 +30,7 @@ interface ClientRow {
 
 interface ClientsData {
   clients: ClientRow[];
+  clients_aggregate: { aggregate: { count: number } };
   offers: Array<{ id: string; name: string; monthly_credits: number }>;
 }
 
@@ -76,16 +79,25 @@ export default function ClientManagement() {
     status: "active",
     offer_id: "",
   });
+  const { currentPage, pageSize, offset, setPage, resetPage } = usePagination();
+
+  useEffect(() => { resetPage() }, [search, resetPage]);
+
+  const where = search.trim()
+    ? { name: { _ilike: `%${search.trim()}%` } }
+    : {};
 
   const { data, loading, error, refetch } = useGraphQL<ClientsData>({
-    query: `query GetClients {
-      clients(order_by: { created_at: desc }) {
+    query: `query($limit: Int!, $offset: Int!, $where: clients_bool_exp) {
+      clients(order_by: { created_at: desc }, limit: $limit, offset: $offset, where: $where) {
         id name status industry website notes created_at
         offer { id name }
         wallet { id balance reserved }
       }
+      clients_aggregate(where: $where) { aggregate { count } }
       offers(order_by: { name: asc }) { id name monthly_credits }
     }`,
+    variables: { limit: pageSize, offset, where },
   });
 
   const { execute: updateClient, loading: updating } = useLazyGraphQL<{
@@ -97,10 +109,8 @@ export default function ClientManagement() {
   );
 
   const clients = data?.clients || [];
+  const totalCount = data?.clients_aggregate?.aggregate?.count || 0;
   const offers = data?.offers || [];
-  const filtered = clients.filter((c) =>
-    c.name.toLowerCase().includes(search.toLowerCase()),
-  );
 
   const openEdit = (c: ClientRow) => {
     setEditClient(c);
@@ -134,7 +144,7 @@ export default function ClientManagement() {
         <div>
           <h1 className="page-title">Gestion Clients</h1>
           <p className="page-subtitle">
-            {clients.length} comptes — création, édition, statut et accès.
+            {totalCount} comptes — création, édition, statut et accès.
           </p>
         </div>
         <Link to="/admin/clients/onboarding" className="btn btn-primary">
@@ -188,7 +198,7 @@ export default function ClientManagement() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((c) => (
+              {clients.map((c) => (
                 <>
                   <tr key={c.id}>
                     <td>
@@ -330,7 +340,7 @@ export default function ClientManagement() {
                   )}
                 </>
               ))}
-              {filtered.length === 0 && (
+              {clients.length === 0 && (
                 <tr>
                   <td
                     colSpan={6}
@@ -348,6 +358,8 @@ export default function ClientManagement() {
           </table>
         )}
       </div>
+
+      <Pagination currentPage={currentPage} totalCount={totalCount} pageSize={pageSize} onPageChange={setPage} />
 
       {editClient && (
         <div className="modal-overlay" onClick={() => setEditClient(null)}>

@@ -1198,6 +1198,46 @@ a:hover {
 }
 
 /* =====================================================
+   PAGINATION
+   ===================================================== */
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-md) 0;
+  margin-top: var(--space-md);
+  gap: var(--space-md);
+  flex-wrap: wrap;
+}
+
+.pagination-info {
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  font-weight: 500;
+}
+
+.pagination-buttons {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.pagination-buttons .btn-sm {
+  min-width: 32px;
+  height: 32px;
+  padding: 0 var(--space-sm);
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.pagination-ellipsis {
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  padding: 0 var(--space-xs);
+  user-select: none;
+}
+
+/* =====================================================
    RESPONSIVE
    ===================================================== */
 @media (max-width: 768px) {

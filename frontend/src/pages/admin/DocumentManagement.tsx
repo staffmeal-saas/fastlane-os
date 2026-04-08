@@ -1,7 +1,9 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Plus, Search, Upload, Eye, Download, ToggleLeft, ToggleRight } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useGraphQL, useLazyGraphQL } from '../../hooks/useGraphQL'
+import { usePagination } from '../../hooks/usePagination'
+import Pagination from '../../components/Pagination'
 import LoadingState from '../../components/UI/LoadingState'
 import ErrorState from '../../components/UI/ErrorState'
 import FileUpload from '../../components/UI/FileUpload'
@@ -14,6 +16,7 @@ interface DocumentsData {
     client?: { id: string; name: string }; campaign?: { id: string; name: string }
     versions_aggregate?: { aggregate?: { count?: number } }
   }>
+  documents_aggregate: { aggregate: { count: number } }
   clients: Array<{ id: string; name: string }>
   campaigns: Array<{ id: string; name: string; client?: { id: string; name: string } }>
 }
@@ -32,13 +35,25 @@ export default function DocumentManagement() {
   const [uploading, setUploading] = useState(false)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [form, setForm] = useState<DocumentForm>({ client_id: '', campaign_id: '', title: '', type: 'other', description: '' })
+  const { currentPage, pageSize, offset, setPage, resetPage } = usePagination()
+
+  useEffect(() => { resetPage() }, [search, resetPage])
+
+  const where = search.trim()
+    ? { _or: [
+        { title: { _ilike: `%${search.trim()}%` } },
+        { client: { name: { _ilike: `%${search.trim()}%` } } },
+      ] }
+    : {}
 
   const { data, loading, error, refetch } = useGraphQL<DocumentsData>({
-    query: `query {
-      documents(order_by: { created_at: desc }) { id title type is_published created_at file_id file_url file_size client { id name } campaign { id name } versions_aggregate { aggregate { count } } }
+    query: `query($limit: Int!, $offset: Int!, $where: documents_bool_exp) {
+      documents(order_by: { created_at: desc }, limit: $limit, offset: $offset, where: $where) { id title type is_published created_at file_id file_url file_size client { id name } campaign { id name } versions_aggregate { aggregate { count } } }
+      documents_aggregate(where: $where) { aggregate { count } }
       clients(order_by: { name: asc }) { id name }
       campaigns(order_by: { name: asc }) { id name client { id name } }
-    }`
+    }`,
+    variables: { limit: pageSize, offset, where },
   })
 
   const { execute: createDoc } = useLazyGraphQL<{ insert_documents_one: { id: string } }>(
@@ -52,6 +67,7 @@ export default function DocumentManagement() {
   )
 
   const documents = data?.documents || []
+  const totalCount = data?.documents_aggregate?.aggregate?.count || 0
   const clients = data?.clients || []
   const campaigns = data?.campaigns || []
 
@@ -60,14 +76,12 @@ export default function DocumentManagement() {
     setUploading(true)
 
     try {
-      // 1. Upload file to storage
       const uploadResult = await nhost.storage.upload(selectedFile, session!.accessToken)
       if (uploadResult.error || !uploadResult.data) {
         setUploading(false)
         return
       }
 
-      // 2. Create document record
       await createDoc({
         obj: {
           client_id: form.client_id,
@@ -112,15 +126,13 @@ export default function DocumentManagement() {
     }
   }
 
-  const filtered = documents.filter(d => d.title.toLowerCase().includes(search.toLowerCase()) || d.client?.name?.toLowerCase().includes(search.toLowerCase()))
-
   if (loading) return <LoadingState />
   if (error) return <ErrorState message={error} onRetry={refetch} />
 
   return (
     <div className="animate-in">
       <div className="page-header">
-        <div><h1 className="page-title">Gestion Documents</h1><p className="page-subtitle">{documents.length} docs — upload, publier, versionner et rattacher les livrables.</p></div>
+        <div><h1 className="page-title">Gestion Documents</h1><p className="page-subtitle">{totalCount} docs — upload, publier, versionner et rattacher les livrables.</p></div>
         <button className="btn btn-primary" onClick={() => setShowModal(true)}><Upload size={16} /> Nouveau document</button>
       </div>
 
@@ -133,7 +145,7 @@ export default function DocumentManagement() {
         <table className="data-table">
           <thead><tr><th>Document</th><th>Client</th><th>Type</th><th>Campagne</th><th>Publié</th><th>Date</th><th>Versions</th><th>Actions</th></tr></thead>
           <tbody>
-            {filtered.map(d => (
+            {documents.map(d => (
               <tr key={d.id}>
                 <td style={{ fontWeight: 700 }}>{d.title}</td>
                 <td>{d.client?.name || '—'}</td>
@@ -158,10 +170,12 @@ export default function DocumentManagement() {
                 </td>
               </tr>
             ))}
-            {filtered.length === 0 && <tr><td colSpan={8} style={{ textAlign: 'center', padding: 'var(--space-xl)', color: 'var(--color-text-muted)' }}>Aucun document.</td></tr>}
+            {documents.length === 0 && <tr><td colSpan={8} style={{ textAlign: 'center', padding: 'var(--space-xl)', color: 'var(--color-text-muted)' }}>Aucun document.</td></tr>}
           </tbody>
         </table>
       </div>
+
+      <Pagination currentPage={currentPage} totalCount={totalCount} pageSize={pageSize} onPageChange={setPage} />
 
       {showModal && (
         <div className="modal-overlay" onClick={() => setShowModal(false)}>

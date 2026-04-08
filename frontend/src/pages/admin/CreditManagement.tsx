@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   CreditCard,
   Plus,
@@ -12,6 +12,8 @@ import {
 } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 import { useGraphQL, useLazyGraphQL } from "../../hooks/useGraphQL";
+import { usePagination } from "../../hooks/usePagination";
+import Pagination from "../../components/Pagination";
 import { useToast } from "../../components/UI/Toast";
 import LoadingState from "../../components/UI/LoadingState";
 import ErrorState from "../../components/UI/ErrorState";
@@ -24,6 +26,15 @@ interface CreditData {
     offer?: { name: string; monthly_credits: number };
     wallet?: { id: string; balance: number; reserved: number };
   }>;
+  clients_aggregate: {
+    aggregate: {
+      count: number;
+      sum?: { balance?: number; reserved?: number };
+    };
+  };
+  offers_aggregate: {
+    aggregate: { sum?: { monthly_credits?: number } };
+  };
   upgrades: Array<{
     id: string;
     credits_amount: number;
@@ -34,6 +45,7 @@ interface CreditData {
     client?: { id: string; name: string };
     wallet?: { id: string; balance: number };
   }>;
+  upgrades_aggregate: { aggregate: { count: number } };
 }
 
 interface AdjustForm {
@@ -71,19 +83,38 @@ export default function CreditManagement() {
   const [tab, setTab] = useState<"wallets" | "upgrades">("wallets");
   const { toast } = useToast();
 
+  const walletsPagination = usePagination();
+  const upgradesPagination = usePagination();
+
+  useEffect(() => { walletsPagination.resetPage() }, [search, walletsPagination.resetPage]);
+
+  const clientWhere = search.trim()
+    ? { name: { _ilike: `%${search.trim()}%` } }
+    : {};
+
   const { data, loading, error, refetch } = useGraphQL<CreditData>({
-    query: `query {
-      clients(order_by: { name: asc }) {
+    query: `query($wLimit: Int!, $wOffset: Int!, $uLimit: Int!, $uOffset: Int!, $clientWhere: clients_bool_exp) {
+      clients(order_by: { name: asc }, limit: $wLimit, offset: $wOffset, where: $clientWhere) {
         id name
         offer { name monthly_credits }
         wallet { id balance reserved }
       }
-      upgrades(order_by: { created_at: desc }) {
+      clients_aggregate(where: $clientWhere) { aggregate { count sum { balance reserved } } }
+      offers_aggregate { aggregate { sum { monthly_credits } } }
+      upgrades(order_by: { created_at: desc }, limit: $uLimit, offset: $uOffset) {
         id credits_amount pack_type status allocation_target created_at
         client { id name }
         wallet { id balance }
       }
+      upgrades_aggregate { aggregate { count } }
     }`,
+    variables: {
+      wLimit: walletsPagination.pageSize,
+      wOffset: walletsPagination.offset,
+      uLimit: upgradesPagination.pageSize,
+      uOffset: upgradesPagination.offset,
+      clientWhere,
+    },
   });
 
   const { execute: adjustCredits } = useLazyGraphQL(
@@ -114,22 +145,33 @@ export default function CreditManagement() {
     }`,
   );
 
+  const { execute: fetchAllEligible } = useLazyGraphQL(
+    `query {
+      clients(where: { wallet: { id: { _is_null: false } }, offer: { monthly_credits: { _gt: 0 } } }) {
+        id
+        offer { monthly_credits }
+        wallet { id balance }
+      }
+    }`,
+  );
+
   const [allocating, setAllocating] = useState(false);
 
   const clients = data?.clients || [];
+  const clientsTotal = data?.clients_aggregate?.aggregate?.count || 0;
   const upgrades = data?.upgrades || [];
+  const upgradesTotal = data?.upgrades_aggregate?.aggregate?.count || 0;
 
   const handleMonthlyAllocation = async () => {
-    const eligible = clients.filter(
-      (c) => c.wallet?.id && c.offer?.monthly_credits,
-    );
-    if (eligible.length === 0) return;
     setAllocating(true);
     const label = new Date().toLocaleDateString("fr-FR", {
       month: "long",
       year: "numeric",
     });
     try {
+      const result = await fetchAllEligible({});
+      const eligible = result?.data?.clients || [];
+      if (eligible.length === 0) return;
       for (const c of eligible) {
         const amount = c.offer!.monthly_credits;
         const balance = c.wallet!.balance || 0;
@@ -203,25 +245,13 @@ export default function CreditManagement() {
     }
   };
 
-  const filtered = clients.filter((c) =>
-    c.name.toLowerCase().includes(search.toLowerCase()),
-  );
   const pendingUpgrades = upgrades.filter(
     (u) =>
       u.status === "demande" || u.status === "valide" || u.status === "paye",
   );
-  const totalBalance = filtered.reduce(
-    (s, c) => s + (c.wallet?.balance || 0),
-    0,
-  );
-  const totalReserved = filtered.reduce(
-    (s, c) => s + (c.wallet?.reserved || 0),
-    0,
-  );
-  const totalAllocation = filtered.reduce(
-    (s, c) => s + (c.offer?.monthly_credits || 0),
-    0,
-  );
+  const totalBalance = data?.clients_aggregate?.aggregate?.sum?.balance || 0;
+  const totalReserved = data?.clients_aggregate?.aggregate?.sum?.reserved || 0;
+  const totalAllocation = data?.offers_aggregate?.aggregate?.sum?.monthly_credits || 0;
 
   if (loading) return <LoadingState />;
   if (error) return <ErrorState message={error} onRetry={refetch} />;
@@ -322,7 +352,6 @@ export default function CreditManagement() {
         </div>
       </div>
 
-      {/* Tabs */}
       <div
         style={{
           display: "flex",
@@ -400,7 +429,7 @@ export default function CreditManagement() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((c) => {
+                {clients.map((c) => {
                   const balance = c.wallet?.balance || 0;
                   const allocation = c.offer?.monthly_credits || 1;
                   const consumed = allocation - balance;
@@ -479,7 +508,7 @@ export default function CreditManagement() {
                     </tr>
                   );
                 })}
-                {filtered.length === 0 && (
+                {clients.length === 0 && (
                   <tr>
                     <td
                       colSpan={6}
@@ -496,120 +525,124 @@ export default function CreditManagement() {
               </tbody>
             </table>
           </div>
+          <Pagination currentPage={walletsPagination.currentPage} totalCount={clientsTotal} pageSize={walletsPagination.pageSize} onPageChange={walletsPagination.setPage} />
         </>
       )}
 
       {tab === "upgrades" && (
-        <div className="card">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Client</th>
-                <th>Pack</th>
-                <th>Crédits</th>
-                <th>Statut</th>
-                <th>Date</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {upgrades.map((u) => (
-                <tr key={u.id}>
-                  <td style={{ fontWeight: 700 }}>{u.client?.name || "—"}</td>
-                  <td>
-                    <span className="badge badge-info">Pack {u.pack_type}</span>
-                  </td>
-                  <td
-                    style={{
-                      fontVariantNumeric: "tabular-nums",
-                      fontWeight: 600,
-                    }}
-                  >
-                    +{u.credits_amount}
-                  </td>
-                  <td>
-                    <span
-                      className={`badge ${upgradeStatusColors[u.status] || "badge-info"}`}
+        <>
+          <div className="card">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Client</th>
+                  <th>Pack</th>
+                  <th>Crédits</th>
+                  <th>Statut</th>
+                  <th>Date</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {upgrades.map((u) => (
+                  <tr key={u.id}>
+                    <td style={{ fontWeight: 700 }}>{u.client?.name || "—"}</td>
+                    <td>
+                      <span className="badge badge-info">Pack {u.pack_type}</span>
+                    </td>
+                    <td
+                      style={{
+                        fontVariantNumeric: "tabular-nums",
+                        fontWeight: 600,
+                      }}
                     >
-                      {upgradeStatusLabels[u.status] || u.status}
-                    </span>
-                  </td>
-                  <td>
-                    {new Date(u.created_at).toLocaleDateString("fr-FR", {
-                      day: "numeric",
-                      month: "short",
-                    })}
-                  </td>
-                  <td>
-                    <div style={{ display: "flex", gap: "var(--space-xs)" }}>
-                      {u.status === "demande" && (
-                        <>
+                      +{u.credits_amount}
+                    </td>
+                    <td>
+                      <span
+                        className={`badge ${upgradeStatusColors[u.status] || "badge-info"}`}
+                      >
+                        {upgradeStatusLabels[u.status] || u.status}
+                      </span>
+                    </td>
+                    <td>
+                      {new Date(u.created_at).toLocaleDateString("fr-FR", {
+                        day: "numeric",
+                        month: "short",
+                      })}
+                    </td>
+                    <td>
+                      <div style={{ display: "flex", gap: "var(--space-xs)" }}>
+                        {u.status === "demande" && (
+                          <>
+                            <button
+                              className="btn btn-sm btn-primary"
+                              onClick={() => handleUpgradeStatus(u.id, "valide")}
+                              title="Valider"
+                            >
+                              <CheckCircle2 size={14} />
+                            </button>
+                            <button
+                              className="btn btn-sm btn-ghost"
+                              onClick={() => handleUpgradeStatus(u.id, "annule")}
+                              title="Refuser"
+                              style={{ color: "var(--color-danger)" }}
+                            >
+                              <XCircle size={14} />
+                            </button>
+                          </>
+                        )}
+                        {u.status === "valide" && (
                           <button
                             className="btn btn-sm btn-primary"
-                            onClick={() => handleUpgradeStatus(u.id, "valide")}
-                            title="Valider"
+                            onClick={() => handleUpgradeStatus(u.id, "paye")}
+                            title="Confirmer paiement"
                           >
                             <CheckCircle2 size={14} />
                           </button>
+                        )}
+                        {u.status === "paye" && (
                           <button
-                            className="btn btn-sm btn-ghost"
-                            onClick={() => handleUpgradeStatus(u.id, "annule")}
-                            title="Refuser"
-                            style={{ color: "var(--color-danger)" }}
+                            className="btn btn-sm btn-primary"
+                            onClick={() => handleValidateAndCredit(u)}
+                            title="Créditer le wallet"
                           >
-                            <XCircle size={14} />
+                            <ArrowUpRight size={14} /> Créditer
                           </button>
-                        </>
-                      )}
-                      {u.status === "valide" && (
-                        <button
-                          className="btn btn-sm btn-primary"
-                          onClick={() => handleUpgradeStatus(u.id, "paye")}
-                          title="Confirmer paiement"
-                        >
-                          <CheckCircle2 size={14} />
-                        </button>
-                      )}
-                      {u.status === "paye" && (
-                        <button
-                          className="btn btn-sm btn-primary"
-                          onClick={() => handleValidateAndCredit(u)}
-                          title="Créditer le wallet"
-                        >
-                          <ArrowUpRight size={14} /> Créditer
-                        </button>
-                      )}
-                      {(u.status === "credite" || u.status === "annule") && (
-                        <span
-                          style={{
-                            fontSize: "0.8rem",
-                            color: "var(--color-text-muted)",
-                          }}
-                        >
-                          —
-                        </span>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-              {upgrades.length === 0 && (
-                <tr>
-                  <td
-                    colSpan={6}
-                    style={{
-                      textAlign: "center",
-                      padding: "var(--space-xl)",
-                      color: "var(--color-text-muted)",
-                    }}
-                  >
-                    Aucune demande de recharge.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+                        )}
+                        {(u.status === "credite" || u.status === "annule") && (
+                          <span
+                            style={{
+                              fontSize: "0.8rem",
+                              color: "var(--color-text-muted)",
+                            }}
+                          >
+                            —
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {upgrades.length === 0 && (
+                  <tr>
+                    <td
+                      colSpan={6}
+                      style={{
+                        textAlign: "center",
+                        padding: "var(--space-xl)",
+                        color: "var(--color-text-muted)",
+                      }}
+                    >
+                      Aucune demande de recharge.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+          <Pagination currentPage={upgradesPagination.currentPage} totalCount={upgradesTotal} pageSize={upgradesPagination.pageSize} onPageChange={upgradesPagination.setPage} />
+        </>
       )}
 
       {showAdjust && (

@@ -1,7 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Search, Shield, UserPlus, Mail, Edit } from "lucide-react";
 import { useGraphQL, useLazyGraphQL } from "../../hooks/useGraphQL";
 import { useAuth } from "../../contexts/AuthContext";
+import { usePagination } from "../../hooks/usePagination";
+import Pagination from "../../components/Pagination";
 import nhost from "../../lib/nhost";
 import LoadingState from "../../components/UI/LoadingState";
 import ErrorState from "../../components/UI/ErrorState";
@@ -22,6 +24,7 @@ interface AccessData {
     platform_role: PlatformRole;
     created_at: string;
   }>;
+  user_profiles_aggregate: { aggregate: { count: number } };
   clients: Array<{ id: string; name: string }>;
   client_members: ClientMember[];
 }
@@ -92,15 +95,27 @@ export default function AccessManagement() {
     platform_role: "client_owner",
     client_id: "",
   });
+  const { currentPage, pageSize, offset, setPage, resetPage } = usePagination();
+
+  useEffect(() => { resetPage() }, [search, resetPage]);
+
+  const where = search.trim()
+    ? { _or: [
+        { display_name: { _ilike: `%${search.trim()}%` } },
+        { platform_role: { _ilike: `%${search.trim()}%` } },
+      ] }
+    : {};
 
   const { data, loading, error, refetch } = useGraphQL<AccessData>({
-    query: `query {
-      user_profiles(order_by: { created_at: desc }) {
+    query: `query($limit: Int!, $offset: Int!, $where: user_profiles_bool_exp) {
+      user_profiles(order_by: { created_at: desc }, limit: $limit, offset: $offset, where: $where) {
         id user_id display_name platform_role created_at
       }
+      user_profiles_aggregate(where: $where) { aggregate { count } }
       clients(order_by: { name: asc }) { id name }
       client_members(order_by: { created_at: desc }) { id user_id role client { id name } }
     }`,
+    variables: { limit: pageSize, offset, where },
   });
 
   const { execute: createProfile } = useLazyGraphQL<{
@@ -129,18 +144,13 @@ export default function AccessManagement() {
     ...p,
     memberships: membersMap[p.user_id] || [],
   }));
+  const totalCount = data?.user_profiles_aggregate?.aggregate?.count || 0;
   const clients = data?.clients || [];
 
-  const filtered = profiles.filter(
-    (u) =>
-      (u.display_name || "").toLowerCase().includes(search.toLowerCase()) ||
-      (u.platform_role || "").toLowerCase().includes(search.toLowerCase()),
-  );
-
-  const internal = filtered.filter((u) =>
+  const internal = profiles.filter((u) =>
     ADMIN_ROLES.includes(u.platform_role),
   );
-  const external = filtered.filter(
+  const external = profiles.filter(
     (u) => !ADMIN_ROLES.includes(u.platform_role),
   );
 
@@ -215,7 +225,7 @@ export default function AccessManagement() {
         <div>
           <h1 className="page-title">Gestion Acces</h1>
           <p className="page-subtitle">
-            {profiles.length} utilisateurs — inviter, attribuer des roles et
+            {totalCount} utilisateurs — inviter, attribuer des roles et
             gerer les permissions.
           </p>
         </div>
@@ -372,6 +382,8 @@ export default function AccessManagement() {
           </tbody>
         </table>
       </div>
+
+      <Pagination currentPage={currentPage} totalCount={totalCount} pageSize={pageSize} onPageChange={setPage} />
 
       {showModal && (
         <div className="modal-overlay" onClick={() => setShowModal(false)}>

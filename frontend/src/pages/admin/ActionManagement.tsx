@@ -1,7 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Plus, Search, Edit } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 import { useGraphQL, useLazyGraphQL } from "../../hooks/useGraphQL";
+import { usePagination } from "../../hooks/usePagination";
+import Pagination from "../../components/Pagination";
 import { useToast } from "../../components/UI/Toast";
 import LoadingState from "../../components/UI/LoadingState";
 import ErrorState from "../../components/UI/ErrorState";
@@ -73,6 +75,7 @@ const validStatuses: ActionStatus[] = [
 
 interface ActionsData {
   actions: ActionRow[];
+  actions_aggregate: { aggregate: { count: number } };
   campaigns: CampaignOption[];
   clients: ClientOption[];
 }
@@ -92,13 +95,25 @@ export default function ActionManagement() {
     due_date: "",
     description: "",
   });
+  const { currentPage, pageSize, offset, setPage, resetPage } = usePagination();
+
+  useEffect(() => { resetPage() }, [search, resetPage]);
+
+  const where = search.trim()
+    ? { _or: [
+        { title: { _ilike: `%${search.trim()}%` } },
+        { client: { name: { _ilike: `%${search.trim()}%` } } },
+      ] }
+    : {};
 
   const { data, loading, error, refetch } = useGraphQL<ActionsData>({
-    query: `query {
-      actions(order_by: { created_at: desc }) { id title status priority credits_reserved credits_consumed due_date client { id name } campaign { id name } }
+    query: `query($limit: Int!, $offset: Int!, $where: actions_bool_exp) {
+      actions(order_by: { created_at: desc }, limit: $limit, offset: $offset, where: $where) { id title status priority credits_reserved credits_consumed due_date client { id name } campaign { id name } }
+      actions_aggregate(where: $where) { aggregate { count } }
       campaigns(order_by: { name: asc }) { id name client { id name } }
       clients(order_by: { name: asc }) { id name }
     }`,
+    variables: { limit: pageSize, offset, where },
   });
 
   const { execute: createAction } = useLazyGraphQL(
@@ -115,6 +130,7 @@ export default function ActionManagement() {
   );
 
   const actions = data?.actions || [];
+  const totalCount = data?.actions_aggregate?.aggregate?.count || 0;
   const campaigns = data?.campaigns || [];
   const clients = data?.clients || [];
 
@@ -173,11 +189,6 @@ export default function ActionManagement() {
   const filteredCampaigns = form.client_id
     ? campaigns.filter((c) => c.client?.id === form.client_id)
     : campaigns;
-  const filtered = actions.filter(
-    (a) =>
-      a.title.toLowerCase().includes(search.toLowerCase()) ||
-      a.client?.name?.toLowerCase().includes(search.toLowerCase()),
-  );
 
   return (
     <div className="animate-in">
@@ -185,7 +196,7 @@ export default function ActionManagement() {
         <div>
           <h1 className="page-title">Gestion Actions</h1>
           <p className="page-subtitle">
-            {actions.length} actions — créer, assigner, planifier et suivre.
+            {totalCount} actions — créer, assigner, planifier et suivre.
           </p>
         </div>
         <button className="btn btn-primary" onClick={() => setShowModal(true)}>
@@ -241,7 +252,7 @@ export default function ActionManagement() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((a) => (
+              {actions.map((a) => (
                 <tr key={a.id}>
                   <td style={{ fontWeight: 700 }}>{a.title}</td>
                   <td>{a.client?.name || "—"}</td>
@@ -335,7 +346,7 @@ export default function ActionManagement() {
                   </td>
                 </tr>
               ))}
-              {filtered.length === 0 && (
+              {actions.length === 0 && (
                 <tr>
                   <td
                     colSpan={8}
@@ -353,6 +364,8 @@ export default function ActionManagement() {
           </table>
         )}
       </div>
+
+      <Pagination currentPage={currentPage} totalCount={totalCount} pageSize={pageSize} onPageChange={setPage} />
 
       {showModal && (
         <div className="modal-overlay" onClick={() => setShowModal(false)}>

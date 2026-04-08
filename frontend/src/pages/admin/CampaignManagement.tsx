@@ -1,12 +1,15 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Plus, Search, Edit, Eye, ChevronUp, X } from "lucide-react";
 import { useGraphQL, useLazyGraphQL } from "../../hooks/useGraphQL";
+import { usePagination } from "../../hooks/usePagination";
+import Pagination from "../../components/Pagination";
 import LoadingState from "../../components/UI/LoadingState";
 import ErrorState from "../../components/UI/ErrorState";
 import type { CampaignStatus } from "../../types";
 
 interface CampaignsData {
   campaigns: CampaignRow[];
+  campaigns_aggregate: { aggregate: { count: number } };
   clients: ClientOption[];
 }
 
@@ -75,17 +78,29 @@ export default function CampaignManagement() {
   const [editCampaign, setEditCampaign] = useState<CampaignRow | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [form, setForm] = useState<CampaignForm>(EMPTY_FORM);
+  const { currentPage, pageSize, offset, setPage, resetPage } = usePagination();
+
+  useEffect(() => { resetPage() }, [search, resetPage]);
+
+  const where = search.trim()
+    ? { _or: [
+        { name: { _ilike: `%${search.trim()}%` } },
+        { client: { name: { _ilike: `%${search.trim()}%` } } },
+      ] }
+    : {};
 
   const { data, loading, error, refetch } = useGraphQL<CampaignsData>({
-    query: `query {
-      campaigns(order_by: { created_at: desc }) {
+    query: `query($limit: Int!, $offset: Int!, $where: campaigns_bool_exp) {
+      campaigns(order_by: { created_at: desc }, limit: $limit, offset: $offset, where: $where) {
         id name status description objectives start_date end_date
         credits_budget credits_consumed
         client { id name }
         actions_aggregate { aggregate { count } }
       }
+      campaigns_aggregate(where: $where) { aggregate { count } }
       clients(order_by: { name: asc }) { id name }
     }`,
+    variables: { limit: pageSize, offset, where },
   });
 
   const { execute: createCampaign } = useLazyGraphQL(
@@ -105,6 +120,7 @@ export default function CampaignManagement() {
   );
 
   const campaigns = data?.campaigns || [];
+  const totalCount = data?.campaigns_aggregate?.aggregate?.count || 0;
   const clients = data?.clients || [];
 
   const handleCreate = async () => {
@@ -170,12 +186,6 @@ export default function CampaignManagement() {
     }
   };
 
-  const filtered = campaigns.filter(
-    (c) =>
-      c.name.toLowerCase().includes(search.toLowerCase()) ||
-      c.client?.name?.toLowerCase().includes(search.toLowerCase()),
-  );
-
   const isModalOpen = showModal || editCampaign !== null;
   const modalTitle = editCampaign
     ? `Modifier ${editCampaign.name}`
@@ -192,7 +202,7 @@ export default function CampaignManagement() {
         <div>
           <h1 className="page-title">Gestion Campagnes</h1>
           <p className="page-subtitle">
-            {campaigns.length} campagnes — créer, piloter, archiver.
+            {totalCount} campagnes — créer, piloter, archiver.
           </p>
         </div>
         <button
@@ -254,9 +264,9 @@ export default function CampaignManagement() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((c) => (
-                <>
-                  <tr key={c.id}>
+              {campaigns.map((c) => (
+                <React.Fragment key={c.id}>
+                  <tr>
                     <td style={{ fontWeight: 700 }}>{c.name}</td>
                     <td>{c.client?.name || "—"}</td>
                     <td>
@@ -389,9 +399,9 @@ export default function CampaignManagement() {
                       </td>
                     </tr>
                   )}
-                </>
+                </React.Fragment>
               ))}
-              {filtered.length === 0 && (
+              {campaigns.length === 0 && (
                 <tr>
                   <td
                     colSpan={7}
@@ -409,6 +419,8 @@ export default function CampaignManagement() {
           </table>
         )}
       </div>
+
+      <Pagination currentPage={currentPage} totalCount={totalCount} pageSize={pageSize} onPageChange={setPage} />
 
       {isModalOpen && (
         <div className="modal-overlay" onClick={closeModal}>
