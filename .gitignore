@@ -30,3 +30,9 @@ npm-debug.log*
 
 # Temporary files
 /tmp/
+
+# Session handoff
+HANDOFF.md
+
+# Local Hasura config (contains admin secret)
+config.yaml
