@@ -10,6 +10,7 @@ module.exports = async function updateCampaign(params, ctx) {
   );
 
   delete fields.created_at;
+  delete fields.id;
 
   const { data, error } = await supabase
     .from('campaigns')
