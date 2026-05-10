@@ -13,15 +13,12 @@ module.exports = async function apiGateway(req, res) {
     return res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'action requis' } });
   }
 
-  // 3. Load handlers lazily
-  const handlerMap = {
-    create_client: require('./actions/create-client'),
-    update_client: require('./actions/update-client'),
-  };
-  // ... add more as they are created
-
-  const handler = handlerMap[action];
-  if (!handler) {
+  // 3. Load handler dynamically by action name
+  const actionName = action.replace(/[^\w]/g, '');
+  let handler;
+  try {
+    handler = require(`./actions/${actionName}`);
+  } catch (e) {
     return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: `Action '${action}' introuvable` } });
   }
 

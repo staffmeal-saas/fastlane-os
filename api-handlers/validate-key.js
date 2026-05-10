@@ -42,9 +42,31 @@ module.exports = async function validateKey(req) {
     .update({ last_used_at: new Date().toISOString() })
     .eq('id', data.id);
 
+  // Fetch user email and role from auth.users via admin secret REST API
+  let email = null;
+  let role = null;
+  try {
+    const authEndpoint = (process.env.NHOST_AUTH_URL || 'http://localhost:4000') + '/api/v1/users/' + data.user_id;
+    const authRes = await fetch(authEndpoint, {
+      headers: {
+        'Authorization': 'Bearer ' + (process.env.NHOST_ADMIN_SECRET || process.env.HASURA_ADMIN_SECRET),
+        'Content-Type': 'application/json'
+      }
+    });
+    if (authRes.ok) {
+      const authData = await authRes.json();
+      email = authData.email || null;
+      role = authData.avatar_url || null; // role stored via metadata or claim
+    }
+  } catch (e) {
+    // auth endpoint unavailable — email remains null
+    console.warn('Could not fetch user email from auth.users:', e.message);
+  }
+
   return {
     userId: data.user_id,
     keyId: data.id,
-    email: null  // we'll resolve email from auth.users in the gateway
+    email,
+    role
   };
 };
