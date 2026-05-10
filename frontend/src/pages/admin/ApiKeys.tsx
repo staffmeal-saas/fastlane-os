@@ -324,8 +324,9 @@ export default function ApiKeysManagement() {
               className="alert alert-warning"
               style={{
                 marginBottom: "var(--space-md)",
-                background: "rgba(245, 158, 11, 0.1)",
-                border: "1px solid rgba(245, 158, 11, 0.3)",
+                background: "rgba(239, 68, 68, 0.1)",
+                border: "1px solid rgba(239, 68, 68, 0.3)",
+                color: "rgba(239, 68, 68, 1)",
               }}
             >
               <strong>⚠️ Copie cette cle maintenant. Elle ne sera plus jamais affichée.</strong>
